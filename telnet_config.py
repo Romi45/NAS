@@ -1,14 +1,15 @@
-from allocate_addres import *
+from adressage_automatique import *
 import ipaddress
 
+
 # Configure Loopback Interface(已完成)
-def config_loopback(ip_loopback, protocol):
+def config_loopback(loopback_address, protocol):
     config = []
 
     config.append("enable")
     config.append("conf t")
     config.append("interface Loopback0")
-    config.append(f"ip address {ip_loopback}")
+    config.append(f"ip address {loopback_address}")
     config.append("no shutdown")
 
     if protocol == "OSPF":
@@ -20,7 +21,7 @@ def config_loopback(ip_loopback, protocol):
 
 
 # Configure each interface(已完成)
-def config_interface(interfaces, protocol, router, connections_matrix_name):
+def config_interface(interfaces, protocol, router):
     config = []
 
     for interface in interfaces:
@@ -35,8 +36,8 @@ def config_interface(interfaces, protocol, router, connections_matrix_name):
         else:
             ipv4_address = interface.get('ip_address', '')  # Get the IP address from the interface dict
 
-            if ip_address:
-                config.append(f"ip address {ip_address}")
+            if ipv4_address:
+                config.append(f"ip address {ipv4_address}")
                 config.append("no shutdown")
 
                 
@@ -58,6 +59,8 @@ def config_interface(interfaces, protocol, router, connections_matrix_name):
 
 
         config.append("end")
+
+
 
     return config  # Moved return statement outside the loop
 
@@ -111,26 +114,6 @@ def config_bgp(router, router_id, routers, connections_matrix_name, routers_dict
 
     config.append("address-family ipv6 unicast")
 
-
-    # Announce neighbor subnet
-    liste = list(routers_dict.keys())
-    if router.name == liste[0] or router.name == liste[-1]:
-        networks = []
-        for interface in router.interfaces:
-            ip_addr = interface.get('ip_address', '')
-            if ip_addr:
-                try:
-                    network = ipaddress.IPv6Network(ip_addr, strict=False)
-                    networks.append(network)
-                except ValueError:
-                    print(f"Invalid IP addresse: {ip_addr}")
-
-        # Sort subnet
-        networks.sort(key=lambda net: (net.network_address, net.prefixlen))
-
-        # Add subnets to configuration
-        for network in networks:
-            config.append(f"network {str(network)}")
     
 
 
@@ -143,24 +126,26 @@ def config_bgp(router, router_id, routers, connections_matrix_name, routers_dict
     return config
 
 # Configure LDP for MPLS
-    def config_mpls(interfaces):
-        
-        config = []
-         
-        for interface in interfaces:
-             
+def config_mpls(interfaces):
+     
+    config = []    
+
+    for interface in interfaces:
+           
             config.append("conf t")
             config.append("mpls ip")
             config.append("mpls label protocol ldp") 
             config.append(f"interface {interface['name']}")
             config.append("mpls ip")
             config.append("exit")
+
+    return config
     
 
 
 #configure the vrfs
 
-    def config_vrf(router, router_id, routers, connections_matrix_name, routers_dict,client_name):
+def config_vrf(router, router_id, routers, connections_matrix_name, routers_dict,client_name):
     
     config = []
     current_as = routers_dict[router.name]['AS']
