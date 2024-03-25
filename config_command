@@ -1,0 +1,28 @@
+#IPv6 Adresse configuration
+Router> enable
+Router# configure terminal
+Router(config)# interface name number
+Router(config-if)# ip address ip-address/prefix-length
+Router(config-if)# no shutdown
+
+#interface: show ip interface
+
+Activate the OSPF protocol on the backbone interface. Make sure you use the same OSPF processid as the one declared earlier:
+Router(config)# interface
+Router(config-if)# ipv6 ospf area
+
+
+
+First, one has to configure the BGP routing process on the routers. 
+Router(config)# router bgp
+Router(config-router)# no bgp default ipv4-unicast
+Device(config-router)# bgp router-id <X.X.X.X>
+
+
+Second, to establish a BGP session between routers R2 and R3 in the figure above, the network administrator of AS112 must first configure on R2 the IP address of R3 on the R2-R3 link and the AS number of R3. Router R2 then regularly tries to establish the BGP session with R3. R3 only agrees to establish the BGP session with R2 once it has been configured with the IP address of R2 and its AS number.
+To establish a BGP session between two routers, use the following commands:
+Router(config-router)# neighbor remote-as
+Router(config-router)# address-family ipv6 unicast
+Router(config-router-af)# neighbor activate
+
+
