@@ -55,7 +55,7 @@ def process_router(as_index, router, all_routers):
 
     config.extend(config_loopback(router.loopback_address, as_index.protocol))
     print(config)
-#     config.extend(config_interface(router.interfaces, as_index.protocol, router, connections_matrix_name))
+    config.extend(config_interface(router.interfaces, as_index.protocol, router))
 
 #     config.extend(config_bgp(router, router_id, all_routers, connections_matrix_name, routers_info))
 

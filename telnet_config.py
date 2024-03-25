@@ -34,28 +34,24 @@ def config_interface(interfaces, protocol, router):
             config.append("shutdown")
 
         else:
-            ipv4_address = interface.get('ip_address', '')  # Get the IP address from the interface dict
 
-            if ipv4_address:
-                config.append(f"ip address {ipv4_address}")
+            if interface.ip_address:
+                config.append(f"ip address {interface.ip_address}")
                 config.append("no shutdown")
 
                 
                 if protocol == "OSPF":  
                     config.append("end")
                     config.append('conf t')
-                    config.append("router ospf 2002")
-                    config.append(f"router-id {router.name[1]}.{router.name[1]}.{router.name[1]}.{router.name[1]}")
+                    config.append("router ospf 666")
+                    router_id = router.loopback_address.split("/")[0]
+                    config.append(f"router-id {router_id}")
                     
                     config.append("end")
 
                     config.append("conf t")
                     config.append(f"interface {interface['name']}")
-                    config.append("ip ospf 2002 area 0")
-
-                    if interface['cost'] != 0:
-                        new_bandwidth = round(100000 / interface['cost'])
-                        config.append(f"bandwidth {new_bandwidth}")
+                    config.append("ip ospf 666 area 0")
 
 
         config.append("end")

@@ -1,7 +1,7 @@
 {
     "AS":[
         {
-            "type": "Noyeau",
+            "type": "Provider",
             "ip_range": "176.100.100.x/30",
             "protocol": "OSPF",
             "routers": [
