@@ -59,37 +59,6 @@ def config_interface(interfaces, protocol, router, connections_matrix_name):
 
         config.append("end")
 
-
-    # passive interface ospf eBGP
-    if protocol == "OSPF" and router.router_type == "eBGP":
-        interface_name = None
-        
-        for elem in connections_matrix_name:
-            ((r1, r2), state) = elem
-
-            if state == 'border':
-                if router.name == r1:
-                    neighbor = r2
-                elif router.name == r2:
-                    neighbor = r1
-                else:
-                    neighbor = None
-
-                if neighbor:
-                    for interface in router.interfaces:
-                        if interface['neighbor'] == neighbor:
-                            interface_name = interface['name']
-                            #print(f"{router.name}找到eBGP邻居对应接口: {interface_name}")
-                            break
-                    
-                    config.append("conf t")
-                    config.append("ip router ospf 2002")
-                    config.append(f"passive-interface {interface_name}")
-                    config.append("end")
-
-
-
-
     return config  # Moved return statement outside the loop
 
 
