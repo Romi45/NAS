@@ -1,9 +1,9 @@
 import gns3fy
-import telnetlib
+import telnetlib3
 import time
 import json
-from allocate_addres import *
-from telnet_configuration import *
+from adressage_automatique import *
+from telnet_config import *
 import threading
 
 
@@ -25,11 +25,13 @@ def get_nodes(project_name):
         node.start()
 
 
+get_nodes("NAS_PROJET_SAVE")
+
 def telnet_write(config,port):
     
     try:
         print(port)
-        tn = telnetlib.Telnet('localhost',port)
+        tn = telnetlib3.Telnet('localhost',port)
         time.sleep(1)
         tn.write(b"\r") #To start writing
         time.sleep(1)
@@ -47,66 +49,66 @@ def telnet_write(config,port):
         print(f"Error: {e}")
 
 
-def process_router(as_index, router, all_routers, connections_matrix_name, routers_info,interfaces):
-    router_loopback = generate_loopback(router.name, as_index.loopback_range)
-    router_id = generate_router_id(router.name)
+def process_router(as_index, router, all_routers):
+
     config = []
 
-    config.extend(config_loopback(router_loopback, as_index.protocol))
-    config.extend(config_interface(router.interfaces, as_index.protocol, router, connections_matrix_name))
-
-    config.extend(config_bgp(router, router_id, all_routers, connections_matrix_name, routers_info))
-
-    config.extend(config_mpls(interfaces))
-
-    config.extend(config_vrf(interfaces))
-    
-    ()
+    config.extend(config_loopback(router.loopback_address, as_index.protocol))
     print(config)
-    telnet_write(config, nodes_ports[router.name])
+#     config.extend(config_interface(router.interfaces, as_index.protocol, router, connections_matrix_name))
+
+#     config.extend(config_bgp(router, router_id, all_routers, connections_matrix_name, routers_info))
+
+#     config.extend(config_mpls(interfaces))
+
+#     config.extend(config_vrf(interfaces))
+    
+#     ()
+#     print(config)
+#     telnet_write(config, nodes_ports[router.name])
 
 
-get_nodes("TEMPLATE GNS3")
+get_nodes("NAS_PROJET_SAVE")
 #print(nodes_ports)
 
 
-with open('router_infos_TBD.json', 'r') as file:
+with open('new intent.json', 'r') as file:
     data = json.load(file)
 
-all_as = [AS(as_info['number'], as_info['IP_range'], as_info['loopback_range'], as_info['protocol'], as_info['routers']) 
-          for as_info in data['AS']]
-
-as_mapping = {}
-for as_index in all_as:
-    for router in as_index.routers:
-        as_mapping[router.name] = as_index.number
-
+all_as = [AS(as_info['type'], as_info['ip_range'], as_info['protocol'], as_info['routers']) for as_info in data['AS']]
 all_routers = [router for as_index in all_as for router in as_index.routers]
-connections_matrix_name = generate_connections_matrix_name(all_routers, as_mapping)
-#print(connections_matrix_name)
-connections_matrix = generate_connections_matrix(all_routers, as_mapping)
-routers_info = generate_routers_dict(all_as)
+#Generation des addresses ip
+iteration = 0
+iteration_client = 0
+for as_index,as_content in enumerate(all_as):
+    for router in as_content.routers:
+        autre_as_index = 0 if as_index==1 else 1
+        iteration_client = generate_ip(iteration, iteration_client, router, all_as[as_index], all_as[autre_as_index])
+        iteration += 1
 
-connection_counts = {"111": 0, "112": 0, "border": 0}
-for conn in connections_matrix:
-    connection_counts[conn[1]] += 1
-
+#Generation des loopbacks
+iteration_loopback = 1
+for as_content in all_as:
+    for router in as_content.routers:
+        generate_loopback(iteration_loopback,router)
+        iteration_loopback += 1
 
 for as_index in all_as:
-    for router in as_index.routers:
-        generate_interface_addresses(router.name, router.interfaces, connections_matrix, connection_counts)
-
-threads = []
-for as_index in all_as:
-    for router in as_index.routers:
-        thread = threading.Thread(target=process_router, args=(as_index, router, all_routers, connections_matrix_name, routers_info))
-        thread.start()
-        threads.append(thread)
+     for router in as_index.routers:
+        process_router(as_index, router, all_routers)
 
 
+# threads = []
+# for as_index in all_as:
+#     for router in as_index.routers:
+#         thread = threading.Thread(target=process_router, args=(as_index, router, all_routers, connections_matrix_name, routers_info))
+#         thread.start()
+#         threads.append(thread)
 
-for thread in threads:
-    thread.join()
+
+
+# for thread in threads:
+#     thread.join()
 
 
         

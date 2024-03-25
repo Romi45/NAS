@@ -78,29 +78,3 @@ def generate_loopback(loopback_iteration,router):
     #Loopback assigner selon l'ordre de declaration des routeurs dans le fichier intent
     loopback_address = "x.x.x.x/32".replace("x",str(loopback_iteration))
     router.loopback_address = loopback_address
-
-
-with open('new intent.json', 'r') as file:
-    data = json.load(file)
-
-all_as = [AS(as_info['type'], as_info['ip_range'], as_info['protocol'], as_info['routers']) 
-          for as_info in data['AS']]
-
-
-iteration = 0
-iteration_client = 0
-for as_index,as_content in enumerate(all_as):
-    for router in as_content.routers:
-        autre_as_index = 0 if as_index==1 else 1
-        iteration_client = generate_ip(iteration, iteration_client, router, all_as[as_index], all_as[autre_as_index])
-        iteration += 1
-
-iteration_loopback = 1
-for as_content in all_as:
-    for router in as_content.routers:
-        generate_loopback(iteration_loopback,router)
-        iteration_loopback += 1
-
-
-print(all_as[0])
-print(all_as[1])
