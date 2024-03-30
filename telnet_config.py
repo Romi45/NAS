@@ -1,14 +1,15 @@
 #Configure Loopback Interface
 def config_loopback(ip_loopback, protocol):
     config = []
-    netmask0 = ip_loopback.split("/")[1]
+    
+    # Creation du netmask à partir du /mask
+    ip_loopback0,netmask0 = ip_loopback.split("/")
     netmask1 = str(256 - 2**(32-int(netmask0)))
     netmask = "255.255.255.x".replace("x",netmask1)
 
-    config.append("enable")
     config.append("conf t")
     config.append("interface Loopback0")
-    config.append(f"ip address {ip_loopback}")
+    config.append(f"ip address {ip_loopback0} {netmask}")
     config.append("no shutdown")
 
     if protocol == "OSPF":
@@ -20,120 +21,138 @@ def config_loopback(ip_loopback, protocol):
 
 
 
-# Configure each interface(已完成)
-def config_interface(interfaces, protocol, router):
+# Configure each interface
+def config_interface(interfaces, protocol, router, as_type, all_as):
     config = []
 
-    for interface in interfaces:
-        config.append("conf t")
+    if protocol == "OSPF":  
+        config.append('conf t')
+        config.append("router ospf 666")
+        router_id = router.loopback_address.split("/")[0]
+        config.append(f"router-id {router_id}")
+        config.append("end")
+    
 
+
+    for interface in interfaces:
+
+        ip_address = interface["ip_address"]
+        ip_address0,netmask0 = ip_address.split("/")
+        netmask1 = str(256 - 2**(32-int(netmask0)))
+        netmask = "255.255.255.x".replace("x",netmask1)
+
+        #liste router as provider
+        r_list = []
+        for r in all_as[0].routers:
+            r_list.append(r.name)
+
+        config.append("conf t")
         config.append(f"interface {interface['name']}")
-        config.append("no ip address")
 
         if interface['neighbor'] == "None":
             config.append("shutdown")
 
-        else:
 
-            if interface.ip_address:
-                config.append(f"ip address {interface.ip_address}")
+        else:
+            if ip_address:
+
+                config.append(f"ip address {ip_address0} {netmask}")
                 config.append("no shutdown")
 
                 
                 if protocol == "OSPF":  
-                    config.append("end")
-                    config.append('conf t')
-                    config.append("router ospf 666")
-                    router_id = router.loopback_address.split("/")[0]
-                    config.append(f"router-id {router_id}")
-                    
-                    config.append("end")
-
-                    config.append("conf t")
-                    config.append(f"interface {interface['name']}")
                     config.append("ip ospf 666 area 0")
+                
+                #Ne fais pas cette commande pour les interfaces de bordure
+                if as_type == "Provider" and interface["neighbor"] in r_list:
+                    config.append("mpls ip")
+            
+            else:
+                config.append("no ip address")
 
 
         config.append("end")
 
 
 
-    return config  # Moved return statement outside the loop
+    return config 
 
 
 
-# Configure bgp neighbor
-def config_bgp(router, router_id, routers, connections_matrix_name, routers_dict):
+# Configure bgp 
+def config_bgp(router, as_info, all_as):
     config = []
-    current_as = routers_dict[router.name]['AS']
-    neighbor_liste = []
-
-    config.append("conf t")
-    config.append(f"router bgp {current_as}")
-    config.append(f"bgp router-id {router_id}")
     
-    if router.router_type == "eBGP":
-        neighbor_ip = None
+    if router.type == "eBGP":
+        as_number = router.as_number
 
-        for elem in connections_matrix_name:
-            ((r1, r2), state) = elem
+        router.as_number = as_number
 
-            if state == 'border':
-                if router.name == r1:
-                    neighbor = r2
-                elif router.name == r2:
-                    neighbor = r1
-                else:
-                    neighbor = None
+        config.append("conf t")
+        config.append(f"router bgp {as_number}")
+        router_id = router.loopback_address.split("/")[0]
+        
+        # Comme ca les routeurs qui ont la même addresse loopback n'auront pas le même router id
+        if as_info.type == "Client":
 
-                if neighbor:
-                    for routeur in routers:
-                        if routeur.name == neighbor:
-                            for interface in routeur.interfaces:
-                                if interface['neighbor'] == router.name:
-                                    print(router.name)
-                                    neighbor_ip = interface.get('ip_address', '')
-                                    print(f"找到邻居ip了{neighbor_ip}")
-                                    break
+            if router.name[2] == "B":
+                router_id = ".".join([router_id.rsplit(".", 1)[0], str(int(router_id.rsplit(".", 1)[1]) + 1)])
 
-                    if neighbor_ip:
-                        as_number = routers_dict[neighbor]['AS']
-                        config.append(f"neighbor {neighbor_ip[:-3]} remote-as {as_number}")
-                        neighbor_liste.append(neighbor_ip[:-3])
-
-    for routeur_name, routeur_info in routers_dict.items():
-        if routeur_name != router.name and routeur_info['AS'] == current_as:
-            config.append(f"neighbor {routeur_info['loopback'][:-4]} remote-as {routeur_info['AS']}")
-            config.append(f"neighbor {routeur_info['loopback'][:-4]} update-source Loopback0")
-            neighbor_liste.append(routeur_info['loopback'][:-4])
+        config.append(f"bgp router-id {router_id}")
 
 
-    config.append("address-family ipv6 unicast")
+        
+        if as_info.type == "Provider":
 
-    
+            #cherche l'id voisin si as provider
+            for r in as_info.routers:
+                if r.type == "eBGP" and router.name != r.name:
+                    id_voisin = r.loopback_address.split("/")[0]
+
+                    config.append(f"neighbor {id_voisin} remote-as {as_number}")
+                    config.append(f"neighbor {id_voisin} update-source Loopback0")
+                    config.append(f"address-family ipv4")
+                    config.append(f"no neighbor {id_voisin} activate")
+                    config.append(f"exit-address-family")
+                    config.append(f"address-family vpnv4")
+                    config.append(f"neighbor {id_voisin} activate")
+                    config.append(f"neighbor {id_voisin} send-community extended")
+                    config.append(f"exit-address-family")
 
 
-    # Activate neighbor IP loopback
-    for ip_neighbor in neighbor_liste:
-        config.append(f"neighbor {ip_neighbor} activate")
 
-    config.append("end")
+        elif as_info.type == "Client":
 
-    return config
+            #avoir une liste des routers dans as provider pour avoir acces  l'ip des voisins
+            r_list = []
+            for r in all_as[0].routers:
+                r_list.append(r.name)
 
-# Configure LDP for MPLS
-def config_mpls(interfaces):
-     
-    config = []    
+            for i in router.interfaces:
 
-    for interface in interfaces:
-           
-            config.append("conf t")
-            config.append("mpls ip")
-            config.append("mpls label protocol ldp") 
-            config.append(f"interface {interface['name']}")
-            config.append("mpls ip")
-            config.append("exit")
+                if i["neighbor"] in r_list:
+                    neighbor_name = i["neighbor"]
+                    neighbor_interface = i["neighbor_interface"]
+
+
+                    for rr in all_as[0].routers:
+                        if rr.name == neighbor_name:
+
+                            for interf in rr.interfaces:
+                                if interf["name"] == neighbor_interface:
+                                    ip_voisin, _ = interf["ip_address"].split("/")
+                                    loopback = router.loopback_address.split("/")[0]
+                                    remote_as = all_as[0].routers[0].as_number
+
+                                    config.append(f"neighbor {ip_voisin} remote-as {remote_as}")
+                                    config.append(f"address-family ipv4")
+                                    config.append(f"network {loopback} mask 255.255.255.255")
+                                    config.append(f"neighbor {ip_voisin} activate")
+                                    config.append(f"neighbor {ip_voisin} allowas-in 1")
+                                    config.append(f"exit-address-family")
+
+
+        config.append("end")
 
     return config
     
@@ -141,23 +160,78 @@ def config_mpls(interfaces):
 
 #configure the vrfs
 
-def config_vrf(router, router_id, routers, connections_matrix_name, routers_dict,client_name):
+def config_vrf(router, as_info, all_as, part):
     
     config = []
-    current_as = routers_dict[router.name]['AS']
-    neighbor_liste = []
+
+    if as_info.type == "Provider" and router.type == "eBGP":
+
+        # invertit les exports et imports pour les routeurs de bordure
+        invert = False
+
+        if router.name[-1] == "2":
+            invert = True
 
 
-    if router.router_type == "eBGP":
-        neighbor_ip = None
+        r_list = []
+        for r in all_as[1].routers:
+                r_list.append(r.name)
+        
+        for interface in router.interfaces:
 
-        for elem in connections_matrix_name:
-            ((PE, CE), state) = elem
+            if interface["neighbor"] in r_list:
+                neighbor_name = interface["neighbor"]
+                neighbor_interface = interface["neighbor_interface"]
 
-            if state == 'border':
-                if router.name == PE:
-                    neighbor = CE
-                elif router.name == CE:
-                    neighbor = PE
-                else:
-                    neighbor = None
+                for rr in all_as[1].routers:
+                    if rr.name == neighbor_name:
+                        as_voisin = rr.as_number
+                        couleur = rr.couleur
+                        for interf in rr.interfaces:
+                            if interf["name"] == neighbor_interface:
+                                ip_voisin, _ = interf["ip_address"].split("/")
+
+                                # On appelle la fonction une premiere fois pour aoir les vrfs quand on set les addresses ip sinon erreur
+                                if part == 1:
+                                    config.append("enable")
+                                    config.append("conf t")
+                                    config.append(f'ip vrf {couleur}')
+                                    config.append(f'rd {as_voisin}:1')
+                                    
+                                    if not invert:
+                                        config.append(f'route-target export {as_voisin}:2')
+                                        config.append(f'route-target import {as_voisin}:3')
+                                    else:
+                                        config.append(f'route-target export {as_voisin}:3')
+                                        config.append(f'route-target import {as_voisin}:2')
+
+                                    config.append("end")
+                                
+
+                                # On l'appelle une deuxieme fois à la fin pour les family address
+                                else:
+
+                                    interface_name = interface["name"]
+                                    ip_address = interface["ip_address"]
+                                    ip_address0,netmask0 = ip_address.split("/")
+                                    netmask1 = str(256 - 2**(32-int(netmask0)))
+                                    netmask = "255.255.255.x".replace("x",netmask1)
+
+                                    config.append("conf t")
+                                    config.append(f"interface {interface_name}")
+                                    config.append(f"ip vrf forwarding {couleur}")
+                                    config.append(f"ip address {ip_address0} {netmask}")
+                                    config.append("no shutdown")
+                                    config.append("end")
+
+                                    config.append("conf t")
+                                    config.append(f"router bgp {router.as_number}")
+                                    config.append(f"address-family ipv4 vrf {couleur}")
+                                    config.append(f"neighbor {ip_voisin} remote-as {as_voisin}")
+                                    config.append(f"neighbor {ip_voisin} activate")
+                                    config.append(f"neighbor {ip_voisin} allowas-in 1")
+                                    config.append(f"exit-address-family")
+                                    config.append("end")
+
+
+    return config

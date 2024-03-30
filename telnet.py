@@ -1,5 +1,5 @@
 import gns3fy
-import telnetlib3
+import telnetlib
 import time
 import json
 from adressage_automatique import *
@@ -25,13 +25,11 @@ def get_nodes(project_name):
         node.start()
 
 
-get_nodes("NAS_PROJET_SAVE")
-
 def telnet_write(config,port):
     
     try:
         print(port)
-        tn = telnetlib3.Telnet('localhost',port)
+        tn = telnetlib.Telnet('localhost',port)
         time.sleep(1)
         tn.write(b"\r") #To start writing
         time.sleep(1)
@@ -49,66 +47,69 @@ def telnet_write(config,port):
         print(f"Error: {e}")
 
 
-def process_router(as_index, router, all_routers):
+def process_router(as_index, router, all_as):
 
     config = []
 
+    config.extend(config_vrf(router, as_index, all_as,1))
     config.extend(config_loopback(router.loopback_address, as_index.protocol))
+    config.extend(config_interface(router.interfaces, as_index.protocol, router, as_index.type, all_as))
+    config.extend(config_bgp(router, as_index, all_as))
+    config.extend(config_vrf(router, as_index, all_as,2))
     print(config)
-    config.extend(config_interface(router.interfaces, as_index.protocol, router))
 
-#     config.extend(config_bgp(router, router_id, all_routers, connections_matrix_name, routers_info))
-
-#     config.extend(config_mpls(interfaces))
-
-#     config.extend(config_vrf(interfaces))
-    
-#     ()
-#     print(config)
-#     telnet_write(config, nodes_ports[router.name])
+    telnet_write(config, nodes_ports[router.name])
 
 
-get_nodes("NAS_PROJET_SAVE")
-#print(nodes_ports)
-
+#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FONCTION DEF ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#------------------------------------------------------------------------------------------------------------------------
+#vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv MAIN vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 
 with open('new intent.json', 'r') as file:
     data = json.load(file)
 
+
+
+get_nodes("NAS_AVANT_BGP_V2_OSPF")
+#print(nodes_ports)
+
+
 all_as = [AS(as_info['type'], as_info['ip_range'], as_info['protocol'], as_info['routers']) for as_info in data['AS']]
 all_routers = [router for as_index in all_as for router in as_index.routers]
+
+
 #Generation des addresses ip
 iteration = 0
 iteration_client = 0
 for as_index,as_content in enumerate(all_as):
     for router in as_content.routers:
         autre_as_index = 0 if as_index==1 else 1
-        iteration_client = generate_ip(iteration, iteration_client, router, all_as[as_index], all_as[autre_as_index])
+        generate_ip(iteration, iteration_client, router, all_as[as_index], all_as[autre_as_index])
+        iteration_client += 1
         iteration += 1
+
 
 #Generation des loopbacks
 iteration_loopback = 1
 for as_content in all_as:
     for router in as_content.routers:
-        generate_loopback(iteration_loopback,router)
+        generate_loopback(iteration_loopback,router,as_content)
         iteration_loopback += 1
 
+        
+
+
+# multi-threaded writing in routers
+threads = []
 for as_index in all_as:
-     for router in as_index.routers:
-        process_router(as_index, router, all_routers)
+    for router in as_index.routers:
+        thread = threading.Thread(target=process_router, args=(as_index, router, all_as))
+        thread.start()
+        threads.append(thread)
 
 
-# threads = []
-# for as_index in all_as:
-#     for router in as_index.routers:
-#         thread = threading.Thread(target=process_router, args=(as_index, router, all_routers, connections_matrix_name, routers_info))
-#         thread.start()
-#         threads.append(thread)
-
-
-
-# for thread in threads:
-#     thread.join()
+for thread in threads:
+    thread.join()
 
 
         

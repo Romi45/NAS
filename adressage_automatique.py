@@ -1,22 +1,30 @@
 import json
 
 class Router:
-    def __init__(self, name, type, interfaces):
+    def __init__(self, name, as_number, interfaces, couleur= None, type=None):
         self.name = name
         self.type = type
         self.loopback_address = ""
         self.interfaces = interfaces
-        
+        self.as_number = as_number
+        self.couleur = couleur
 
     def __str__(self):
-        return f"Router(Name: {self.name}, Type: {self.type}, Loopback: {self.loopback_address}, Interfaces: {self.interfaces})"
+        return f"Router(Name: {self.name}, Type: {self.type}, Loopback: {self.loopback_address}, Interfaces: {self.interfaces}, As_number: {self.as_number}, Couleur: {self.couleur})"
 
 class AS:
     def __init__(self, type, ip_range, protocol, routers):
         self.type = type
         self.ip_range = ip_range
         self.protocol = protocol
-        self.routers = [Router(router['name'], router['type'], router['interfaces']) for router in routers]
+        self.routers = [self.regle_router(router) for router in routers]
+
+    # on utilise cette fonction comme ca je peux set les attributs à None si ils figurent pas sur le json
+    def regle_router(self, router):
+
+        type = router.get('type')
+        couleur = router.get('couleur')
+        return Router(router['name'], router['as_number'], router['interfaces'], couleur, type)
 
     def __str__(self):
         router_str = '\n  '.join(str(router) for router in self.routers)
@@ -67,14 +75,26 @@ def generate_ip(iteration,iteration_client, router, AS, Autre_AS):
                                 if interf["neighbor_interface"] == interface["name"]:
                                     mirror_ip_address = (Autre_AS.ip_range).replace('x','2').replace('y',str(iteration_client))
                                     interf["ip_address"] =  mirror_ip_address
-                                    iteration_client += 1
 
     
-    return iteration_client
 
 
-def generate_loopback(loopback_iteration,router):
+def generate_loopback(loopback_iteration,router,as_content):
 
-    #Loopback assigner selon l'ordre de declaration des routeurs dans le fichier intent
-    loopback_address = "x.x.x.x/32".replace("x",str(loopback_iteration))
-    router.loopback_address = loopback_address
+    # Les routeurs clients d'un côté ont tous la même addresse loopback (c'est un peu moche comme code)
+
+    loopback_address = ""
+
+    if as_content.type == "Client":
+        if router.name[2] == "A":
+            router.loopback_address = "x.x.x.x/32".replace("x",str(loopback_iteration))
+
+        else:
+            for r in as_content.routers:
+                if r.name[2] == "A" and router.name[-1] == r.name[-1]:
+                    router.loopback_address = r.loopback_address
+                    break
+
+
+    else:
+        router.loopback_address = "x.x.x.x/32".replace("x",str(loopback_iteration))

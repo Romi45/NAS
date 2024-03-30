@@ -8,6 +8,7 @@
                  {
                     "name": "PE1",
                     "type": "eBGP",
+                    "as_number": "111",
                     "interfaces": [
                         {
                             "name": "FastEthernet0/0",
@@ -33,7 +34,7 @@
                 
                 {
                     "name": "LSR1",
-                    "type": "None",
+                    "as_number": "111",
                     "interfaces": [
                         {
                             "name": "FastEthernet0/0",
@@ -50,7 +51,7 @@
                 },
                 {
                     "name": "LSR2",
-                    "type": "None",
+                    "as_number": "111",
                     "interfaces": [
                         {
                             "name": "FastEthernet0/0",
@@ -68,6 +69,7 @@
                 {
                     "name": "PE2",
                     "type": "eBGP",
+                    "as_number": "111",
                     "interfaces": [
                         {
                             "name": "FastEthernet0/0",
@@ -100,6 +102,8 @@
                 {
                    "name": "CEA1",
                    "type": "eBGP",
+                   "as_number": "222",
+                   "couleur": "rouge",
                    "interfaces": [
                        {
                            "name": "GigabitEthernet2/0",
@@ -113,6 +117,8 @@
                {
                 "name": "CEB1",
                 "type": "eBGP",
+                "as_number": "333",
+                "couleur": "bleu",
                 "interfaces": [
                     {
                         "name": "GigabitEthernet2/0",
@@ -126,6 +132,8 @@
                 {
                     "name": "CEA2",
                     "type": "eBGP",
+                    "as_number": "222",
+                    "couleur": "rouge",
                     "interfaces": [
                         {
                             "name": "GigabitEthernet2/0",
@@ -139,6 +147,8 @@
                 {
                     "name": "CEB2",
                     "type": "eBGP",
+                    "as_number": "333",
+                    "couleur": "bleu",
                     "interfaces": [
                         {
                             "name": "GigabitEthernet1/0",
